@@ -1,0 +1,5 @@
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+const root=new URL('../',import.meta.url),manifest=JSON.parse(await readFile(new URL('plugin.json',root),'utf8')),copy=JSON.parse(await readFile(new URL('.codex-plugin/plugin.json',root),'utf8'));
+for(const field of ['name','version','description','author','license'])assert.deepEqual(copy[field],manifest[field],field);assert.equal(manifest.name,'com.xsec.workspace.project-outcomes');assert.equal(manifest.version,'2.0.0');const desktop=manifest.extensions['com.xsec.desktop'];assert.equal(desktop.frontendApi.version,2);assert.equal(desktop.frontendApi.module,'single-esm');assert.equal(desktop.entrypoints.frontend,'./com.xsec.desktop/frontend/index.js');
+assert.deepEqual(Object.keys(desktop.permissions).sort(),['workspace.project.read','workspace.session.read','workspace.session.write','workspace.tool.open']);assert.deepEqual(Object.keys(desktop.frontendApi.methods).sort(),['xsec.outcomes.evidence.list','xsec.outcomes.get','xsec.outcomes.list','xsec.outcomes.reference.add','xsec.outcomes.resolve','xsec.outcomes.task.get','xsec.workspace.tool.open']);

@@ -48,6 +48,10 @@ const THEME_CSS=`
   font: 14px/1.45 var(--ui-font);
   -webkit-font-smoothing: antialiased;
 }
+/* 强调色上的文字按强调色的明度取白或黑。声明里带 var()，旧 WebView 要到计算值时才失效，所以必须包在 @supports 里。 */
+@supports (color: oklch(from red l c h)) {
+  :root { --ui-on-accent: oklch(from var(--ui-accent) clamp(0, (.65 - l) * 1000, 1) 0 0); }
+}
 *, *::before, *::after { box-sizing: border-box; }
 html, body, [data-xsec-plugin-root] { min-width: 0; min-height: 100%; margin: 0; }
 button, textarea, input { font: inherit; color: inherit; }
@@ -90,6 +94,19 @@ button { -webkit-tap-highlight-color: transparent; }
 }
 .ui-toast svg { flex: 0 0 auto; color: var(--ui-success); }
 .ui-toast span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ⓘ：悬停、键盘聚焦或点按时展开说明。 */
+.ui-info {
+  position: relative; display: grid; flex: 0 0 auto; width: 24px; height: 24px; place-items: center; padding: 0; border: 0;
+  border-radius: 50%; background: transparent; color: var(--ui-muted); cursor: help;
+}
+.ui-info:hover, .ui-info[aria-expanded="true"] { background: var(--ui-hover); color: var(--ui-text); }
+.ui-info-tip {
+  display: none; position: absolute; top: calc(100% + 6px); left: 0; z-index: 6; width: max-content; max-width: min(240px, 70vw);
+  padding: 6px 10px; border: 1px solid var(--ui-hairline); border-radius: var(--ui-radius); background: var(--ui-surface);
+  color: var(--ui-text); box-shadow: var(--ui-shadow); font-size: 12px; font-weight: 400; line-height: 1.5; text-align: left; white-space: normal;
+}
+.ui-info:hover .ui-info-tip, .ui-info:focus-visible .ui-info-tip, .ui-info[aria-expanded="true"] .ui-info-tip { display: block; }
 
 .ui-empty { display: grid; justify-items: center; align-content: center; gap: 10px; min-height: 220px; padding: 32px 24px; color: var(--ui-muted); text-align: center; }
 .ui-empty-mark { display: grid; width: 40px; height: 40px; place-items: center; border-radius: var(--ui-radius-panel); background: var(--ui-subtle); color: var(--ui-muted); }
@@ -136,7 +153,7 @@ const CSS=THEME_CSS+`
 .app{display:flex;flex-direction:column;min-height:100vh;background:var(--ui-surface)}
 .heading{position:sticky;top:0;z-index:3;display:flex;align-items:center;gap:4px;height:52px;flex:0 0 auto;padding:0 8px 0 12px;border-bottom:1px solid var(--ui-hairline);background:var(--ui-surface)}
 .heading h1{flex:0 1 auto;min-width:0;margin:0;overflow:hidden;font-size:14px;font-weight:600;text-overflow:ellipsis;white-space:nowrap}
-.heading-info{display:grid;place-items:center;width:20px;height:20px;margin-right:auto;color:var(--ui-faint);cursor:help}
+.heading-info{margin-right:auto}
 .heading h1:last-of-type:not(:has(+ .heading-info)){margin-right:auto}
 .body{display:grid;align-content:start;gap:12px;flex:1;min-width:0;padding:12px 12px 24px}
 .controls{display:grid;gap:8px}
@@ -148,15 +165,15 @@ const CSS=THEME_CSS+`
 .search-field{position:relative;display:block}
 .search-field svg{position:absolute;top:50%;left:10px;transform:translateY(-50%);color:var(--ui-faint);pointer-events:none}
 .search{width:100%;height:32px;padding:0 10px 0 32px;border:1px solid transparent;border-radius:var(--ui-radius);background:var(--ui-subtle);color:var(--ui-text);transition:border-color .12s var(--ui-ease),background-color .12s var(--ui-ease)}
-.search::placeholder{color:var(--ui-faint)}
+.search::placeholder{color:var(--ui-muted)}
 .search:focus{border-color:var(--ui-accent-text);background:var(--ui-surface);outline:0}
 .filters{display:flex;flex-wrap:wrap;gap:6px}
 .filter{display:inline-flex;align-items:center;gap:6px;height:28px;font-size:13px;padding:0 10px;border:0;border-radius:999px;background:var(--ui-subtle);color:var(--ui-muted);font-weight:500;white-space:nowrap;cursor:pointer;transition:background-color .12s var(--ui-ease),color .12s var(--ui-ease)}
 .filter:hover{background:var(--ui-hover);color:var(--ui-text)}
-.filter span{color:var(--ui-faint);font-size:12px;font-variant-numeric:tabular-nums}
+.filter span{color:var(--ui-muted);font-size:12px;font-variant-numeric:tabular-nums}
 .filter.is-active{background:var(--ui-accent);color:var(--ui-on-accent)}
 .filter.is-active span{color:inherit;opacity:.8}
-.notice{margin:0;color:var(--ui-faint);font-size:12px;overflow-wrap:anywhere}
+.notice{margin:0;color:var(--ui-muted);font-size:12px;overflow-wrap:anywhere}
 .notice:empty{display:none}
 .notice.error{padding:8px 12px;border-radius:var(--ui-radius);background:var(--ui-danger-soft);color:var(--ui-danger);font-size:14px}
 .list{display:grid;gap:8px}
@@ -173,7 +190,7 @@ const CSS=THEME_CSS+`
 .card-head{display:flex;align-items:center;gap:8px;min-width:0}
 .card-head strong{min-width:0;overflow:hidden;font-weight:600;text-overflow:ellipsis;white-space:nowrap}
 .meta{overflow:hidden;color:var(--ui-muted);font-size:13px;text-overflow:ellipsis;white-space:nowrap}
-.meta.is-faint{color:var(--ui-faint);font-size:12px;font-variant-numeric:tabular-nums}
+.meta.is-faint{color:var(--ui-muted);font-size:12px;font-variant-numeric:tabular-nums}
 .add{margin:0 8px 0 4px;opacity:0}
 .add.ui-button{width:28px;height:28px}
 .row:hover .add,.add:focus-visible{opacity:1}
@@ -193,7 +210,7 @@ const CSS=THEME_CSS+`
 .back:hover{background:var(--ui-hover)}
 .back>svg{flex:0 0 auto;color:var(--ui-muted)}
 .detail-title{display:grid;min-width:0}
-.detail-title small{color:var(--ui-faint);font-size:12px}
+.detail-title small{color:var(--ui-muted);font-size:12px}
 .detail-title strong{font-size:14px;font-weight:600;overflow-wrap:anywhere}
 .actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .summary{margin:0;color:var(--ui-text);white-space:pre-wrap;overflow-wrap:anywhere}
@@ -244,6 +261,14 @@ function icon(name,size=16){
   return svg;
 }
 
+// ⓘ 说明：悬停、键盘聚焦或点按都能看到；Esc 或失焦收起。
+function infoButton(message){
+  const node=el("button","ui-info"),tip=el("span","ui-info-tip",message),toggle=open=>node.setAttribute("aria-expanded",String(open));
+  node.type="button";node.setAttribute("aria-label",message);toggle(false);tip.setAttribute("aria-hidden","true");
+  node.addEventListener("click",()=>toggle(node.getAttribute("aria-expanded")!=="true"));node.addEventListener("blur",()=>toggle(false));
+  node.addEventListener("keydown",event=>{if(event.key==="Escape")toggle(false)});
+  node.append(icon("info",14),tip);return node
+}
 function el(tag,className,value){const node=document.createElement(tag);if(className)node.className=className;if(value!==undefined)node.textContent=value;return node}
 function button(className,label,onClick){const node=el("button",className,label);node.type="button";node.addEventListener("click",onClick);return node}
 function iconButton(className,name,label,onClick){const node=button("ui-button is-ghost is-icon "+className,"",onClick);node.setAttribute("aria-label",label);node.title=label;node.append(icon(name));return node}
@@ -388,7 +413,7 @@ function refreshView(state){
 
 function appendCollectionAction(state,actions){actions.push(iconButton("icon-btn","at","添加项目成果集合到对话",()=>addReference(state,"collection")))}
 function appendHeader(state,app){
-  const heading=el("header","heading"),actions=[],info=el("span","heading-info");info.title="项目内共享 · 跨对话复用";info.setAttribute("role","img");info.setAttribute("aria-label","项目内共享 · 跨对话复用");info.append(icon("info",14));
+  const heading=el("header","heading"),actions=[],info=infoButton("项目内共享 · 跨对话复用");info.classList.add("heading-info");
   if(isOutcomesTool(state)&&state.context.canAdd)appendCollectionAction(state,actions);
   actions.push(iconButton("icon-btn","refresh","刷新项目成果",()=>refreshView(state)));heading.append(el("h1","",TITLE[state.context.tool]??"项目成果"),info,...actions);app.append(heading);
 }

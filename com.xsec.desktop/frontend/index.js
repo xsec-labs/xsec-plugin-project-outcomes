@@ -120,6 +120,7 @@ svg { width: 16px; height: 16px; flex: none; }
 .err-more:hover { color: var(--ui-text); }
 .err-retry { padding: 4px 8px; border: 0; border-radius: 6px; background: var(--ui-surface); font-weight: 500; cursor: pointer; }
 .err-detail { margin: 0; padding: 0 10px 8px 34px; color: var(--ui-muted); font-size: 12px; overflow-wrap: anywhere; white-space: pre-wrap; }
+.stopped { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px 6px 12px; border-bottom: 1px solid var(--ui-hair); background: var(--ui-subtle); color: var(--ui-muted); font-size: 12px; }
 .foot { display: flex; flex: none; align-items: center; height: 28px; padding: 0 12px; border-top: 1px solid var(--ui-hair); color: var(--ui-muted); font-size: 12px; }
 .more { display: block; width: 100%; height: 36px; border: 0; background: transparent; color: var(--ui-muted); cursor: pointer; }
 .more:hover:not(:disabled) { background: var(--ui-subtle); color: var(--ui-text); }
@@ -316,10 +317,10 @@ function scheduleSearch(state){cancelSearch(state);state.listRev+=1;state.search
 function loadOutcomes(state,options){
   cancelSearch(state);
   const rev=++state.listRev,wanted=state.kind==="all"?undefined:[state.kind],withCounts=options?.counts!==false;
-  state.loading=true;state.error=null;state.loadingMore=false;renderList(state);
+  state.loading=true;state.stopped=false;state.error=null;state.loadingMore=false;renderList(state);
   console.info("project-outcomes.request.started",{method:"xsec.outcomes.list"});
   const main=state.invoke({method:"xsec.outcomes.list",params:listParams(state)});
-  const side=wanted&&withCounts?state.invoke({method:"xsec.outcomes.list",params:{...listParams(state),kinds:undefined,limit:1}}):Promise.resolve(null);
+  const side=wanted&&withCounts?state.invoke({method:"xsec.outcomes.list",params:{...listParams(state),kinds:undefined,limit:1}}).catch(()=>null):Promise.resolve(null);
   void Promise.all([main,side]).then(([page,all])=>{
     if(rev!==state.listRev)return;
     console.info("project-outcomes.request.completed",{method:"xsec.outcomes.list",count:items(page).length});
@@ -335,7 +336,7 @@ function loadOutcomes(state,options){
 function loadMore(state){
   if(state.loadingMore||state.nextOffset===null)return;
   const rev=state.listRev;state.loadingMore=true;renderList(state);
-  void state.invoke({method:"xsec.outcomes.list",params:listParams(state,{offset:state.items.length})}).then((page)=>{
+  void state.invoke({method:"xsec.outcomes.list",params:listParams(state,{offset:state.nextOffset})}).then((page)=>{
     if(rev!==state.listRev)return;
     state.items=state.items.concat(items(page));state.nextOffset=page?.next_offset??null;state.loadingMore=false;renderList(state);
   }).catch((error)=>{
@@ -343,7 +344,7 @@ function loadMore(state){
     state.loadingMore=false;renderList(state);toast(state,"加载更多失败："+failure(error),true);
   });
 }
-function stopLoading(state){state.listRev+=1;state.loading=false;state.loadingMore=false;renderList(state)}
+function stopLoading(state){state.listRev+=1;state.loading=false;state.loadingMore=false;state.stopped=true;renderList(state)}
 function setScope(state,value){if(state.scope===value)return;state.scope=value;loadOutcomes(state,{counts:true})}
 function setKind(state,value){if(state.kind===value)return;state.kind=value;loadOutcomes(state,{counts:false})}
 function clearFilters(state){state.query="";state.kind="all";if(state.nodes.input)state.nodes.input.value="";loadOutcomes(state,{counts:true})}
@@ -396,12 +397,14 @@ function renderList(state){
   nodes.err.replaceChildren();if(state.error)nodes.err.append(errorBar(state,"读取失败："+state.error,()=>loadOutcomes(state,{counts:true})));
   const body=nodes.list;
   if(loadingFirst)body.replaceChildren(skeletonRows());
+  else if(state.stopped&&!state.items.length)body.replaceChildren(centerMessage("stop","已停止读取","",button("btn","重新读取",()=>loadOutcomes(state,{counts:true}))));
   else if(!state.items.length&&!state.error){
     const clear=filtered?button("btn",state.query.trim()?"清除搜索":"显示全部",()=>clearFilters(state)):null;
     body.replaceChildren(filtered?centerMessage("search","没有匹配的成果","换个关键词，或在整个项目范围里查找。",clear):centerMessage("box","还没有项目成果","Agent 确认的漏洞、证据和报告会显示在这里。"));
   }else{
     const list=el("div",""),single=state.kind!=="all"||Object.values(state.counts).filter(Boolean).length<=1;for(const row of state.items)list.append(outcomeRow(state,row,{plainKind:single}));
     if(state.nextOffset!==null){const more=button("more",state.loadingMore?"正在加载…":"加载更多",()=>loadMore(state));more.disabled=state.loadingMore;list.append(more)}
+    if(state.stopped){const note=el("div","stopped");note.append(el("span","","已停止读取，列表可能与当前搜索和筛选不一致"),button("err-retry","重新读取",()=>loadOutcomes(state,{counts:true})));list.prepend(note)}
     body.replaceChildren(list);
   }
   nodes.foot.className=state.error&&state.updatedAt?"foot":"";nodes.foot.textContent=state.error&&state.updatedAt?"上次更新 "+clock(new Date(state.updatedAt)):"";
@@ -574,7 +577,7 @@ function update(state,context){
   if(isOutcomesTool(state)){state.view="list";buildListShell(state);loadOutcomes(state,{counts:true})}else refreshView(state);
 }
 function createController(host){
-  const state={invoke:(options)=>invoke(host,options),root:null,context:contextInfo(host.context),scope:"project",kind:"all",query:"",items:[],counts:{},total:0,nextOffset:null,loading:false,loadingMore:false,error:null,updatedAt:null,view:"list",spec:null,detail:null,detailError:null,detailLoading:false,showRaw:false,listRev:0,detailRev:0,searchTimer:undefined,toastTimer:undefined,menuClose:undefined,nodes:{}};
+  const state={invoke:(options)=>invoke(host,options),root:null,context:contextInfo(host.context),scope:"project",kind:"all",query:"",items:[],counts:{},total:0,nextOffset:null,loading:false,loadingMore:false,stopped:false,error:null,updatedAt:null,view:"list",spec:null,detail:null,detailError:null,detailLoading:false,showRaw:false,listRev:0,detailRev:0,searchTimer:undefined,toastTimer:undefined,menuClose:undefined,nodes:{}};
   return{mount(root){console.info("project-outcomes.mount",{tool:state.context.tool});state.root=root;update(state,host.context)},update(context){update(state,context)},dispose(){console.debug("project-outcomes.dispose",{tool:state.context.tool});cancelSearch(state);closeMenu(state);clearTimeout(state.toastTimer);state.listRev+=1;state.detailRev+=1;state.root?.replaceChildren()}};
 }
 export function activate(host){console.debug("project-outcomes.activate",{apiVersion:host.apiVersion});return createController(host)}
